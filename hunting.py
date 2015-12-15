@@ -2,7 +2,7 @@
 # Retrieve results of VT Hunting feature
 #
 # Author: David DURVAUX
-# Copyrigh: EC DIGIT CSIRC - December 2015
+# Copyright: EC DIGIT CSIRC - December 2015
 #
 # TODO:
 #    - Improve/review proxy support
@@ -51,6 +51,8 @@ def getHuntingResult():
         # retrieve JSON object from Virus Total
         jsonfd = urllib2.urlopen(vturl % (vtapi))
         jsonstr = jsonfd.read()
+
+        print("DEBUG: %s" % (jsonstr)) #DEBUG
 
         try:
             # parse JSON
@@ -161,14 +163,19 @@ def main():
         outfile = sys.stdout
 
     # API KEY
-    global apikey
+    global vtapi
     if args.api:
-        apikey = args.api
+        vtapi = args.api
 
     # Threshold control
     global vtthresh
     if args.threshold:
         vtthresh = args.threshold
+
+    # Check if minimum set of parameters is available
+    if(vtapi is None):
+        print("ERROR: you need to specify at least an API key.  Use -h to get the manual.")
+        return
 
     # Do all the magic now :)
     results = getHuntingResult()
