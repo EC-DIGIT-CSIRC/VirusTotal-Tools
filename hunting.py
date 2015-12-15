@@ -52,8 +52,6 @@ def getHuntingResult():
         jsonfd = urllib2.urlopen(vturl % (vtapi))
         jsonstr = jsonfd.read()
 
-        print("DEBUG: %s" % (jsonstr)) #DEBUG
-
         try:
             # parse JSON
             jsonvt = json.loads(jsonstr)
