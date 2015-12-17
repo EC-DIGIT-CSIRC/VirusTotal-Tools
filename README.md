@@ -4,7 +4,7 @@
 
 The script aims at retrieving Hunting result from VirusTotal.  After you upload your set of YARA rules (see demo in demo folder), you can retrieve all the results by at least defining your API key to the script.
 
-<code>
+<syntaxhighlight>
 usage: hunting.py [-h] [-api API] [-thres THRESHOLD] [-puri PROXY_URI]
                   [-pusr PROXY_USER] [-ppwd PROXY_PASSWORD] [-json JSON]
                   [-out OUTPUT] [-samples SAMPLES_DIRECTORY]
@@ -31,4 +31,4 @@ optional arguments:
   -samples SAMPLES_DIRECTORY, --samples_directory SAMPLES_DIRECTORY
                         Directory where to wrote all matching samples (by
                         default not done)
-</code>
+</syntaxhighlight>
