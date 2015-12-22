@@ -168,7 +168,7 @@ def main():
     # Threshold control
     global vtthresh
     if args.threshold:
-        vtthresh = args.threshold
+        vtthresh = int(args.threshold)
 
     # Check if minimum set of parameters is available
     if(vtapi is None):
