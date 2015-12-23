@@ -7,12 +7,13 @@
 # TODO:
 #    - Improve/review proxy support
 #
-# Version 0.1 
+# Version 0.2
 #
 import urllib
 import urllib2
 import json
 import os
+import errno
 import argparse
 import csv
 import sys
@@ -21,8 +22,9 @@ import sys
 vtapi = None
 vturl = "https://www.virustotal.com/intelligence/hunting/notifications-feed/?key=%s"
 vtdwl = "https://www.virustotal.com/intelligence/download/?hash=%s&apikey=%s"
+vtdhu = "https://www.virustotal.com/intelligence/hunting/delete-notifications/programmatic/?key=%s"
 vtthresh = 3
-directory = "./out"
+directory = None
 
 # Proxy settings
 proxy_uri = None
@@ -32,6 +34,33 @@ proxy_pwd = None
 # Output information
 jsonres = "./vt-result.json"
 outfile = sys.stdout
+
+def makeDirectory(path):
+    try:
+        os.makedirs(path)
+    except OSError as ose:
+        if ose.errno == errno.EEXIST and os.path.isdir(path):
+            pass
+        else: raise
+
+def splitResults(results):
+    for i in xrange(0, len(results), 100):
+        yield results[i:i+100]
+
+def cleanupNotifications(results):
+    # Delete the notification from VT so they don't get double processed/retreived
+    for group in list(splitResults(results)):
+        data = json.dumps([str(x[-1]) for x in group])
+        try:
+            req = urllib2.Request(vtdhu % (vtapi), data, {'Content-Type': 'application/json'})
+            f = urllib2.urlopen(req)
+            resp = json.loads(f.read())
+            #{"deleted": 3, "received": 3, "result": 1}
+            f.close()
+            if resp['deleted'] != resp['received']:
+                print "ERROR: Issue deleting notification IDs from VirusTotal :'('"
+        except:
+            print "ERROR: Connection error :'("
 
 def getHuntingResult():
     # Some funcky thinks
@@ -55,38 +84,42 @@ def getHuntingResult():
         try:
             # parse JSON
             jsonvt = json.loads(jsonstr)
+            #print jsonvt
             for notification in jsonvt["notifications"]:
-            	positive = notification["positives"]
-            	yararule = notification["subject"]
-            	sha1 = notification["sha1"]
-            	fseen = notification["first_seen"]
-            	lseen = notification["last_seen"]
-            	objtype = notification["type"]
+                positive = notification["positives"]
+                yararule = notification["subject"]
+                sha1 = notification["sha1"]
+                fseen = notification["first_seen"]
+                lseen = notification["last_seen"]
+                objtype = notification["type"]
+                nid = notification["id"]
 
-                if(int(positive) >= vtthresh):
+                if(int(positive) >= int(vtthresh)):
                     # add result to list of results
-            	    result.append([positive, yararule, sha1, fseen, lseen, objtype])
+                    result.append([positive, yararule, sha1, fseen, lseen, objtype, nid])
 
-                    if(directory is not None):
+                    if(directory):
                         try:
-                    		# retrieve sample
-                    		# The following way to retrieve is commented due to issue
-                    		# with proxy
-                    		# urllib.urlretrieve(vtdwl % (sha1, vtapi), "%s/%s" % (directory, sha1))
-                    		vtfile = urllib2.urlopen(vtdwl % (sha1, vtapi), "%s/%s")
-                    		output = open("%s/%s" % (directory, sha1),'wb')
-                    		output.write(vtfile.read())
-                    		output.close()
+                            # retrieve sample
+                            # The following way to retrieve is commented due to issue
+                            # with proxy
+                            # urllib.urlretrieve(vtdwl % (sha1, vtapi), "%s/%s" % (directory, sha1))
+                            filedir = directory + '/' + yararule
+                            makeDirectory(filedir)
+                            vtfile = urllib2.urlopen(vtdwl % (sha1, vtapi), "%s/%s")
+                            output = open("%s/%s" % (filedir, sha1),'wb')
+                            output.write(vtfile.read())
+                            output.close()
                         except:
-                            print "ERROR: Impossible to retrieve sample %s from VirusTotal :'(" % sha1    
+                            print "ERROR: Impossible to retrieve sample %s from VirusTotal :'(" % sha1
 
             # Save JSON to file
-            if(jsonres is not None):    
+            if(jsonres is not None):
                 fd = open(jsonres, "w")
                 fd.write(jsonstr)
                 fd.close()
         except:
-            print "ERROR: Invalid result retrieved from VirusTotal (JSON Parsing Error) :'("    
+            print "ERROR: Invalid result retrieved from VirusTotal (JSON Parsing Error) :'("
 
         # Return result
         return result
@@ -107,10 +140,11 @@ def main():
 
     # Argument definition
     parser = argparse.ArgumentParser(description='Retrieve results of VirusTotal Hunting.')
-    
+
     # VirusTotal options
     parser.add_argument('-api', '--api', help='VirusTotal API key')
     parser.add_argument('-thres', '--threshold', help='Number of required infection to keep result (default 3)')
+    parser.add_argument('-cleanup', '--cleanup', action="store_true", help='Cleanup notifications of retreived files from VirusTotal')
 
     # Proxy Settings
     parser.add_argument('-puri', '--proxy_uri', help='Proxy URI')
@@ -131,9 +165,8 @@ def main():
         directory = os.path.dirname(args.samples_directory)
 
     # If directory doesn't exists yet, create it
-    if directory is not None:
-        if not os.path.exists(directory):
-                os.makedirs(directory)
+    if directory:
+        makeDirectory(directory)
 
     # Parse Proxy Options
     global proxy_uri
@@ -178,6 +211,10 @@ def main():
     # Do all the magic now :)
     results = getHuntingResult()
     outputResults(results, outfile)
+
+    # Cleanup processed results
+    if args.cleanup:
+        cleanupNotifications(results)
 
 # Call the main function of this script and trigger all the magic \o/
 if __name__ == "__main__":
