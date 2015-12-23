@@ -32,7 +32,7 @@ proxy_usr = None
 proxy_pwd = None
 
 # Output information
-jsonres = "./vt-result.json"
+jsonres = None
 outfile = sys.stdout
 
 def makeDirectory(path):
@@ -65,9 +65,9 @@ def cleanupNotifications(results):
 def getHuntingResult():
     # Some funcky thinks
     # Create an OpenerDirector with support for Basic HTTP Authentication...
-    if(proxy_uri is not None):
+    if proxy_uri:
         proxy = None
-        if(proxy_usr is not None and proxy_pwd is not None):
+        if proxy_usr and proxy_pwd:
             proxy = urllib2.ProxyHandler({'https' : 'http://%s:%s@%s' % (proxy_usr, proxy_pwd, proxy_uri)})
         else:
             proxy = urllib2.ProxyHandler({'https' : 'http://%s' % (proxy_uri)})
@@ -114,7 +114,7 @@ def getHuntingResult():
                             print "ERROR: Impossible to retrieve sample %s from VirusTotal :'(" % sha1
 
             # Save JSON to file
-            if(jsonres is not None):
+            if jsonres:
                 fd = open(jsonres, "w")
                 fd.write(jsonstr)
                 fd.close()
@@ -204,7 +204,7 @@ def main():
         vtthresh = int(args.threshold)
 
     # Check if minimum set of parameters is available
-    if(vtapi is None):
+    if vtapi:
         print("ERROR: you need to specify at least an API key.  Use -h to get the manual.")
         return
 
