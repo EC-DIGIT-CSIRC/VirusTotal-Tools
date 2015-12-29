@@ -83,11 +83,8 @@ def getHuntingResult():
         jsonstr = jsonfd.read()
         try:
             while jsonstr != '':
-                print "*%s*" %jsonstr
                 # parse JSON
                 jsonvt = json.loads(jsonstr)
-                count = 0
-                #print jsonvt
                 for notification in jsonvt["notifications"]:
                     positive = notification["positives"]
                     yararule = notification["subject"]
@@ -240,7 +237,7 @@ def main():
         if args.cleanup:
             cleanupNotifications(results)
     else:
-        print "No results returned"
+        sys.stderr.write("No results returned\n")
 
 # Call the main function of this script and trigger all the magic \o/
 if __name__ == "__main__":
