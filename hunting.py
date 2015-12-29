@@ -8,6 +8,8 @@
 #    - Improve/review proxy support
 #
 # Version 0.2
+# Contributions by:
+# Mike Sconzo - @sooshie
 #
 import urllib
 import urllib2
