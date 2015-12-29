@@ -25,6 +25,7 @@ vtdwl = "https://www.virustotal.com/intelligence/download/?hash=%s&apikey=%s"
 vtdhu = "https://www.virustotal.com/intelligence/hunting/delete-notifications/programmatic/?key=%s"
 vtthresh = 3
 directory = None
+download = False
 
 # Proxy settings
 proxy_uri = None
@@ -80,38 +81,42 @@ def getHuntingResult():
         # retrieve JSON object from Virus Total
         jsonfd = urllib2.urlopen(vturl % (vtapi))
         jsonstr = jsonfd.read()
-
         try:
-            # parse JSON
-            jsonvt = json.loads(jsonstr)
-            #print jsonvt
-            for notification in jsonvt["notifications"]:
-                positive = notification["positives"]
-                yararule = notification["subject"]
-                sha1 = notification["sha1"]
-                fseen = notification["first_seen"]
-                lseen = notification["last_seen"]
-                objtype = notification["type"]
-                nid = notification["id"]
+            while jsonstr != '':
+                print "*%s*" %jsonstr
+                # parse JSON
+                jsonvt = json.loads(jsonstr)
+                count = 0
+                #print jsonvt
+                for notification in jsonvt["notifications"]:
+                    positive = notification["positives"]
+                    yararule = notification["subject"]
+                    sha1 = notification["sha1"]
+                    fseen = notification["first_seen"]
+                    lseen = notification["last_seen"]
+                    objtype = notification["type"]
+                    nid = notification["id"]
 
-                if(int(positive) >= int(vtthresh)):
-                    # add result to list of results
-                    result.append([positive, yararule, sha1, fseen, lseen, objtype, nid])
+                    if(int(positive) >= int(vtthresh)):
+                        # add result to list of results
+                        result.append([positive, yararule, sha1, fseen, lseen, objtype, nid])
 
-                    if(directory):
-                        try:
-                            # retrieve sample
-                            # The following way to retrieve is commented due to issue
-                            # with proxy
-                            # urllib.urlretrieve(vtdwl % (sha1, vtapi), "%s/%s" % (directory, sha1))
-                            filedir = directory + '/' + yararule
-                            makeDirectory(filedir)
-                            vtfile = urllib2.urlopen(vtdwl % (sha1, vtapi), "%s/%s")
-                            output = open("%s/%s" % (filedir, sha1),'wb')
-                            output.write(vtfile.read())
-                            output.close()
-                        except:
-                            print "ERROR: Impossible to retrieve sample %s from VirusTotal :'(" % sha1
+                        if(directory) and (download):
+                            try:
+                                # retrieve sample
+                                # The following way to retrieve is commented due to issue
+                                # with proxy
+                                # urllib.urlretrieve(vtdwl % (sha1, vtapi), "%s/%s" % (directory, sha1))
+                                filedir = directory + '/' + yararule
+                                makeDirectory(filedir)
+                                vtfile = urllib2.urlopen(vtdwl % (sha1, vtapi), "%s/%s")
+                                output = open("%s/%s" % (filedir, sha1),'wb')
+                                output.write(vtfile.read())
+                                output.close()
+                            except:
+                                print "ERROR: Impossible to retrieve sample %s from VirusTotal :'(" % sha1
+                jsonfd = urllib2.urlopen(vturl % (vtapi))
+                jsonstr = jsonfd.read()
 
             # Save JSON to file
             if jsonres:
@@ -125,13 +130,26 @@ def getHuntingResult():
         return result
     except:
         print "ERROR: Failed to retrieve Hunting result from VirusTotal :'("
-        return None
+    return None
 
 def outputResults(results, outfile=sys.stdout):
-    LDwriter = csv.writer(outfile)
-    LDwriter.writerow(["# of detection", "YARA rule", "SHA1", "Binary type", "First seen", "Last seen"])
-    for row in results:
-        LDwriter.writerow(row)
+    if len(results) > 0:
+        if outfile != sys.stdout:
+            ofilename = outfile
+            filenum = 0
+            while os.path.isfile(outfile):
+                filenum = 1 + filenum
+                outfile = ofilename + "." + str(filenum)
+            with open(outfile, 'wb') as csvfile:
+                LDwriter = csv.writer(csvfile)
+                LDwriter.writerow(["# of detection", "YARA rule", "SHA1", "Binary type", "First seen", "Last seen"])
+                for row in results:
+                    LDwriter.writerow(row)
+        else:
+            LDwriter = csv.writer(outfile)
+            LDwriter.writerow(["# of detection", "YARA rule", "SHA1", "Binary type", "First seen", "Last seen"])
+            for row in results:
+                LDwriter.writerow(row)
 
 def main():
     """
@@ -145,6 +163,7 @@ def main():
     parser.add_argument('-api', '--api', help='VirusTotal API key')
     parser.add_argument('-thres', '--threshold', help='Number of required infection to keep result (default 3)')
     parser.add_argument('-cleanup', '--cleanup', action="store_true", help='Cleanup notifications of retreived files from VirusTotal')
+    parser.add_argument('-dl', '--download', action="store_true", help='Download the samples in addition to getting notifications')
 
     # Proxy Settings
     parser.add_argument('-puri', '--proxy_uri', help='Proxy URI')
@@ -168,6 +187,10 @@ def main():
     if directory:
         makeDirectory(directory)
 
+    global download
+    if args.download:
+        download = args.download
+
     # Parse Proxy Options
     global proxy_uri
     global proxy_usr
@@ -189,7 +212,7 @@ def main():
     # Control output instead of stdout
     global outfile
     if args.output:
-        outfile = args.outfile
+        outfile = args.output
     else:
         outfile = sys.stdout
 
@@ -204,17 +227,20 @@ def main():
         vtthresh = int(args.threshold)
 
     # Check if minimum set of parameters is available
-    if vtapi:
+    if not vtapi:
         print("ERROR: you need to specify at least an API key.  Use -h to get the manual.")
         return
 
     # Do all the magic now :)
     results = getHuntingResult()
-    outputResults(results, outfile)
+    if results and len(results) > 0:
+        outputResults(results, outfile)
 
-    # Cleanup processed results
-    if args.cleanup:
-        cleanupNotifications(results)
+        # Cleanup processed results
+        if args.cleanup:
+            cleanupNotifications(results)
+    else:
+        print "No results returned"
 
 # Call the main function of this script and trigger all the magic \o/
 if __name__ == "__main__":
