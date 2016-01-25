@@ -28,6 +28,7 @@ vtdhu = "https://www.virustotal.com/intelligence/hunting/delete-notifications/pr
 vtthresh = 3
 directory = None
 download = False
+DEBUG = True
 
 # Proxy settings
 proxy_uri = None
@@ -91,14 +92,17 @@ def getHuntingResult():
                     positive = notification["positives"]
                     yararule = notification["subject"]
                     sha1 = notification["sha1"]
+                    sha256 = notification["sha256"]
                     fseen = notification["first_seen"]
                     lseen = notification["last_seen"]
                     objtype = notification["type"]
                     nid = notification["id"]
+                    if DEBUG:
+                        print "[*] " + sha256
 
                     if(int(positive) >= int(vtthresh)):
                         # add result to list of results
-                        result.append([positive, yararule, sha1, fseen, lseen, objtype, nid])
+                        result.append([positive, yararule, sha1, sha256, fseen, lseen, objtype, nid])
 
                         if(directory) and (download):
                             try:
@@ -112,8 +116,12 @@ def getHuntingResult():
                                 output = open("%s/%s" % (filedir, sha1),'wb')
                                 output.write(vtfile.read())
                                 output.close()
-                            except:
+                            except Exception as e:
                                 print "ERROR: Impossible to retrieve sample %s from VirusTotal :'(" % sha1
+                                if DEBUG:
+                                    print "[*] " + str(e)
+                # Cleanup processed results
+                cleanupNotifications(result)
                 jsonfd = urllib2.urlopen(vturl % (vtapi))
                 jsonstr = jsonfd.read()
 
@@ -122,8 +130,10 @@ def getHuntingResult():
                 fd = open(jsonres, "w")
                 fd.write(jsonstr)
                 fd.close()
-        except:
+        except Exception as e:
             print "ERROR: Invalid result retrieved from VirusTotal (JSON Parsing Error) :'("
+            if DEBUG:
+                print "[*] " + str(e)
 
         # Return result
         return result
@@ -161,7 +171,6 @@ def main():
     # VirusTotal options
     parser.add_argument('-api', '--api', help='VirusTotal API key')
     parser.add_argument('-thres', '--threshold', help='Number of required infection to keep result (default 3)')
-    parser.add_argument('-cleanup', '--cleanup', action="store_true", help='Cleanup notifications of retreived files from VirusTotal')
     parser.add_argument('-dl', '--download', action="store_true", help='Download the samples in addition to getting notifications')
 
     # Proxy Settings
@@ -234,10 +243,6 @@ def main():
     results = getHuntingResult()
     if results and len(results) > 0:
         outputResults(results, outfile)
-
-        # Cleanup processed results
-        if args.cleanup:
-            cleanupNotifications(results)
     else:
         sys.stderr.write("No results returned\n")
 
